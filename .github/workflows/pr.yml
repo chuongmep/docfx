@@ -1,0 +1,32 @@
+name: pr
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  update-snapshot:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.comment.body == '/update-snapshot'}}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: refs/pull/${{ github.event.issue.number }}/head
+        lfs: true
+
+    - uses: ./.github/actions/build
+
+    - run: dotnet test -c Release --filter Stage=Snapshot --no-build
+      working-directory: test/docfx.Snapshot.Tests
+      env:
+        UPDATE_SNAPSHOT: true
+
+    - run: |
+        git config --global user.name docfx
+        git config --global user.email "docfx@users.noreply.github.com"
+
+        git add -A
+        if ! git diff-index --quiet HEAD; then
+          git commit -m "test(snapshot): update snapshots for $GITHUB_SHA"
+          git push
+        fi
+
